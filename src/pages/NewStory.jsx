@@ -161,17 +161,58 @@ export default function NewStory() {
                 );
             });
 
-            const response = await fetch(
-                '/api/stories/',
-                {
-                    method: 'POST',
-                    credentials: 'include',
-                    body: formData
-                }
-            );
+            const API_BASE_URL =
+    "https://travel-companion-coral.vercel.app";
 
-            const data =
-                await response.json();
+const csrfResponse = await fetch(
+    `${API_BASE_URL}/api/csrf/`,
+    {
+        credentials: "include",
+    }
+);
+
+const csrfData = await csrfResponse.json();
+
+if (!csrfResponse.ok) {
+    throw new Error(
+        csrfData.error || "Unable to get CSRF token."
+    );
+}
+
+const response = await fetch(
+    `${API_BASE_URL}/api/stories/`,
+    {
+        method: "POST",
+        credentials: "include",
+        headers: {
+            "X-CSRFToken": csrfData.csrfToken,
+        },
+        body: formData,
+    }
+);
+
+const responseText = await response.text();
+
+let data = {};
+
+try {
+    data = responseText
+        ? JSON.parse(responseText)
+        : {};
+} catch {
+    throw new Error(
+        `Server returned an invalid response (${response.status}).`
+    );
+}
+
+if (!response.ok) {
+    throw new Error(
+        data?.error ||
+        data?.detail ||
+        "Unable to publish story."
+    );
+}
+
 
             if (!response.ok) {
                 throw new Error(
