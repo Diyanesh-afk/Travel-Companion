@@ -1,8 +1,15 @@
 from django.urls import path
+from django.http import JsonResponse
+from django.middleware.csrf import get_token
 from . import views
 
+def csrf_token(request):
+    return JsonResponse({
+        "csrfToken": get_token(request)
+    })
 
 urlpatterns = [
+    path("csrf/", csrf_token),
     path("health/", views.health),
     path("auth/register/", views.register),
     path("auth/login/", views.login_api),
