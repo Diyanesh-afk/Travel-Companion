@@ -1,90 +1,137 @@
-const API_BASE_URL = "https://travel-companion-coral.vercel.app";
+const API_BASE_URL =
+    "https://travel-companion-coral.vercel.app";
 
-let csrfToken = null;
 
-async function getCsrfToken() {
-    if (csrfToken) {
-        return csrfToken;
+function buildUrl(path) {
+    if (path.startsWith("http://") || path.startsWith("https://")) {
+        return path;
     }
 
-    const response = await fetch(`${API_BASE_URL}/api/csrf/`, {
-        method: "GET",
-        credentials: "include",
-    });
+    if (!path.startsWith("/")) {
+        path = "/" + path;
+    }
 
-    const data = await response.json().catch(() => ({}));
+    return `${API_BASE_URL}${path}`;
+}
+
+
+function getCookie(name) {
+    const cookies = document.cookie.split("; ");
+
+    const cookie = cookies.find(row =>
+        row.startsWith(`${name}=`)
+    );
+
+    return cookie
+        ? decodeURIComponent(cookie.split("=")[1])
+        : "";
+}
+
+
+async function getCsrfToken() {
+    const response = await fetch(
+        `${API_BASE_URL}/api/csrf/`,
+        {
+            credentials: "include",
+        }
+    );
+
+    const data = await response.json();
 
     if (!response.ok) {
         throw new Error(
             data.error ||
-            data.detail ||
-            `CSRF request failed (${response.status})`
+            "Unable to get CSRF token."
         );
     }
 
-    csrfToken = data.csrfToken;
-
-    return csrfToken;
+    return data.csrfToken;
 }
 
-const api = async (path, options = {}) => {
-    const method = (options.method || "GET").toUpperCase();
+
+async function api(path, options = {}) {
+    const method =
+        (options.method || "GET").toUpperCase();
+
+    const url = buildUrl(path);
 
     const headers = {
         ...(options.headers || {}),
     };
 
-    if (
-        options.body &&
-        !(options.body instanceof FormData) &&
-        !headers["Content-Type"]
-    ) {
-        headers["Content-Type"] = "application/json";
+    const isFormData =
+        options.body instanceof FormData;
+
+    if (!isFormData && options.body !== undefined) {
+        headers["Content-Type"] =
+            "application/json";
     }
 
-    if (["POST", "PUT", "PATCH", "DELETE"].includes(method)) {
-        const token = await getCsrfToken();
+    if (
+        method !== "GET" &&
+        method !== "HEAD" &&
+        method !== "OPTIONS"
+    ) {
+        const csrfToken =
+            getCookie("csrftoken") ||
+            await getCsrfToken();
 
-        if (token) {
-            headers["X-CSRFToken"] = token;
+        headers["X-CSRFToken"] = csrfToken;
+    }
+
+    const response = await fetch(
+        url,
+        {
+            ...options,
+            credentials: "include",
+            headers,
+        }
+    );
+
+    const text =
+        await response.text();
+
+    let data = {};
+
+    if (text) {
+        try {
+            data = JSON.parse(text);
+        } catch {
+            throw new Error(
+                `Server returned an invalid response (${response.status}).`
+            );
         }
     }
 
-    const response = await fetch(`${API_BASE_URL}${path}`, {
-        credentials: "include",
-        ...options,
-        headers,
-    });
-
-    const data = await response.json().catch(() => ({}));
-
     if (!response.ok) {
         throw new Error(
-            data.error ||
-            data.detail ||
-            `Request failed (${response.status})`
+            data?.error ||
+            data?.detail ||
+            `Request failed (${response.status}).`
         );
     }
 
     return data;
-};
+}
+
 
 export const get = (path) => {
     return api(path);
 };
 
+
 export const post = (path, body = {}) => {
+    const isFormData =
+        body instanceof FormData;
+
     return api(path, {
         method: "POST",
-        body: JSON.stringify(body),
+        body: isFormData
+            ? body
+            : JSON.stringify(body),
     });
 };
 
-export const del = (path) => {
-    return api(path, {
-        method: "DELETE",
-    });
-};
 
 export const put = (path, body = {}) => {
     return api(path, {
@@ -93,6 +140,7 @@ export const put = (path, body = {}) => {
     });
 };
 
+
 export const patch = (path, body = {}) => {
     return api(path, {
         method: "PATCH",
@@ -100,20 +148,27 @@ export const patch = (path, body = {}) => {
     });
 };
 
-export const auth = {
-    me: () => get("/api/me/"),
 
-    login: (body) => {
-        return post("/api/auth/login/", body);
-    },
-
-    register: (body) => {
-        return post("/api/auth/register/", body);
-    },
-
-    logout: () => {
-        return post("/api/auth/logout/");
-    },
+export const del = (path) => {
+    return api(path, {
+        method: "DELETE",
+    });
 };
+
+
+export const auth = {
+    me: () =>
+        get("/api/me/"),
+
+    login: (body) =>
+        post("/api/auth/login/", body),
+
+    register: (body) =>
+        post("/api/auth/register/", body),
+
+    logout: () =>
+        post("/api/auth/logout/"),
+};
+
 
 export default api;
