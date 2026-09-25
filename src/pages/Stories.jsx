@@ -40,17 +40,20 @@ export default function Stories() {
             setLoading(true);
             setError("");
 
-            const response = await get("/api/stories/");
+            const data = await get("/api/stories/");
 
-            setStories(response.items || []);
+            setStories(
+                Array.isArray(data?.items)
+                    ? data.items
+                    : []
+            );
         } catch (err) {
-            console.error("Stories loading failed:", err);
+            console.error("Stories loading error:", err);
 
             setError(
-                err.message || "Unable to load stories."
+                err.message ||
+                "Unable to load stories."
             );
-
-            setStories([]);
         } finally {
             setLoading(false);
         }
@@ -66,12 +69,22 @@ export default function Stories() {
                 `/api/stories/${story.id}/`
             );
 
-            setSelectedStory(data.story || data);
+            setSelectedStory(
+                data?.story || data
+            );
         } catch (err) {
-            console.error("Story detail error:", err);
+            console.error(
+                "Story detail error:",
+                err
+            );
 
+            /*
+             * Keep the already loaded story visible
+             * even if the detail request fails.
+             */
             setDetailError(
-                err.message || "Unable to open this story."
+                err.message ||
+                "Unable to load story details."
             );
         } finally {
             setDetailLoading(false);
@@ -89,8 +102,8 @@ export default function Stories() {
                 `/api/stories/${storyId}/like/`
             );
 
-            setStories((currentStories) =>
-                currentStories.map((story) =>
+            setStories(currentStories =>
+                currentStories.map(story =>
                     story.id === storyId
                         ? {
                               ...story,
@@ -101,7 +114,7 @@ export default function Stories() {
                 )
             );
 
-            setSelectedStory((currentStory) =>
+            setSelectedStory(currentStory =>
                 currentStory &&
                 currentStory.id === storyId
                     ? {
@@ -112,10 +125,9 @@ export default function Stories() {
                     : currentStory
             );
         } catch (err) {
-            console.error("Like error:", err);
-
-            alert(
-                err.message || "Unable to like story."
+            console.error(
+                "Like error:",
+                err
             );
         }
     }
@@ -126,8 +138,8 @@ export default function Stories() {
                 `/api/stories/${storyId}/save/`
             );
 
-            setStories((currentStories) =>
-                currentStories.map((story) =>
+            setStories(currentStories =>
+                currentStories.map(story =>
                     story.id === storyId
                         ? {
                               ...story,
@@ -138,7 +150,7 @@ export default function Stories() {
                 )
             );
 
-            setSelectedStory((currentStory) =>
+            setSelectedStory(currentStory =>
                 currentStory &&
                 currentStory.id === storyId
                     ? {
@@ -149,10 +161,9 @@ export default function Stories() {
                     : currentStory
             );
         } catch (err) {
-            console.error("Save error:", err);
-
-            alert(
-                err.message || "Unable to save story."
+            console.error(
+                "Save error:",
+                err
             );
         }
     }
@@ -163,7 +174,7 @@ export default function Stories() {
         ).trim();
 
         if (!text) {
-            setCommentErrors((current) => ({
+            setCommentErrors(current => ({
                 ...current,
                 [storyId]:
                     "Please write a comment first.",
@@ -173,25 +184,23 @@ export default function Stories() {
         }
 
         try {
-            setCommentLoading((current) => ({
+            setCommentLoading(current => ({
                 ...current,
                 [storyId]: true,
             }));
 
-            setCommentErrors((current) => ({
+            setCommentErrors(current => ({
                 ...current,
                 [storyId]: "",
             }));
 
             const data = await post(
                 `/api/stories/${storyId}/comments/`,
-                {
-                    text,
-                }
+                { text }
             );
 
-            setStories((currentStories) =>
-                currentStories.map((story) =>
+            setStories(currentStories =>
+                currentStories.map(story =>
                     story.id === storyId
                         ? {
                               ...story,
@@ -199,14 +208,15 @@ export default function Stories() {
                                   Array.isArray(
                                       story.comments
                                   )
-                                      ? story.comments.length + 1
-                                      : (story.comments || 0) + 1,
+                                      ? story.comments
+                                      : (story.comments ||
+                                          0) + 1,
                           }
                         : story
                 )
             );
 
-            setSelectedStory((currentStory) => {
+            setSelectedStory(currentStory => {
                 if (
                     !currentStory ||
                     currentStory.id !== storyId
@@ -215,7 +225,7 @@ export default function Stories() {
                 }
 
                 const newComment =
-                    data.comment || null;
+                    data?.comment || null;
 
                 if (
                     Array.isArray(
@@ -236,33 +246,40 @@ export default function Stories() {
                 return {
                     ...currentStory,
                     comments:
-                        (currentStory.comments || 0) + 1,
+                        (currentStory.comments ||
+                            0) + 1,
                 };
             });
 
-            setCommentText((current) => ({
+            setCommentText(current => ({
                 ...current,
                 [storyId]: "",
             }));
         } catch (err) {
-            console.error("Comment error:", err);
+            console.error(
+                "Comment error:",
+                err
+            );
 
-            setCommentErrors((current) => ({
+            setCommentErrors(current => ({
                 ...current,
                 [storyId]:
                     err.message ||
                     "Unable to add comment.",
             }));
         } finally {
-            setCommentLoading((current) => ({
+            setCommentLoading(current => ({
                 ...current,
                 [storyId]: false,
             }));
         }
     }
 
-    function handleCommentChange(storyId, value) {
-        setCommentText((current) => ({
+    function handleCommentChange(
+        storyId,
+        value
+    ) {
+        setCommentText(current => ({
             ...current,
             [storyId]: value,
         }));
@@ -282,21 +299,27 @@ export default function Stories() {
                 `/api/stories/${storyId}/`
             );
 
-            setStories((current) =>
+            setStories(current =>
                 current.filter(
-                    (story) => story.id !== storyId
+                    story =>
+                        story.id !== storyId
                 )
             );
 
-            setSelectedStory((current) =>
+            setSelectedStory(current =>
                 current?.id === storyId
                     ? null
                     : current
             );
         } catch (err) {
+            console.error(
+                "Delete story error:",
+                err
+            );
+
             alert(
                 err.message ||
-                    "Unable to delete story."
+                "Unable to delete story."
             );
         }
     }
@@ -318,11 +341,13 @@ export default function Stories() {
                 `/api/comments/${commentId}/`
             );
 
-            setSelectedStory((current) => {
+            setSelectedStory(current => {
                 if (
                     !current ||
                     current.id !== storyId ||
-                    !Array.isArray(current.comments)
+                    !Array.isArray(
+                        current.comments
+                    )
                 ) {
                     return current;
                 }
@@ -331,30 +356,37 @@ export default function Stories() {
                     ...current,
                     comments:
                         current.comments.filter(
-                            (comment) =>
-                                comment.id !== commentId
+                            comment =>
+                                comment.id !==
+                                commentId
                         ),
                 };
             });
 
-            setStories((current) =>
-                current.map((story) =>
+            setStories(current =>
+                current.map(story =>
                     story.id === storyId
                         ? {
                               ...story,
                               comments:
                                   Math.max(
                                       0,
-                                      (story.comments || 0) - 1
+                                      (story.comments ||
+                                          0) - 1
                                   ),
                           }
                         : story
                 )
             );
         } catch (err) {
+            console.error(
+                "Delete comment error:",
+                err
+            );
+
             alert(
                 err.message ||
-                    "Unable to delete comment."
+                "Unable to delete comment."
             );
         }
     }
@@ -362,23 +394,26 @@ export default function Stories() {
     const filteredStories =
         activeCategory === "All"
             ? stories
-            : stories.filter((story) => {
-                  const tags =
-                      story.tags || [];
+            : stories.filter(story => {
+                  const tags = Array.isArray(
+                      story.tags
+                  )
+                      ? story.tags
+                      : [];
 
-                  return tags.some(
-                      (tag) =>
-                          tag
-                              .toLowerCase()
-                              .includes(
-                                  activeCategory.toLowerCase()
-                              )
+                  return tags.some(tag =>
+                      String(tag)
+                          .toLowerCase()
+                          .includes(
+                              activeCategory.toLowerCase()
+                          )
                   );
               });
 
     return (
         <Layout>
             <div className="stories-page">
+
                 <div className="stories-header">
                     <div>
                         <h1>Stories</h1>
@@ -392,7 +427,9 @@ export default function Stories() {
                     <button
                         className="primary-button"
                         onClick={() =>
-                            navigate("/stories/new")
+                            navigate(
+                                "/stories/new"
+                            )
                         }
                     >
                         + Share your story
@@ -401,7 +438,7 @@ export default function Stories() {
 
                 <div className="story-categories">
                     {categories.map(
-                        (category) => (
+                        category => (
                             <button
                                 key={category}
                                 className={
@@ -446,7 +483,7 @@ export default function Stories() {
 
                 <div className="stories-grid">
                     {filteredStories.map(
-                        (story) => (
+                        story => (
                             <article
                                 className="story-card"
                                 key={story.id}
@@ -459,9 +496,11 @@ export default function Stories() {
                                         )
                                     }
                                 >
-                                    {story.media?.length >
+                                    {story.media
+                                        ?.length >
                                     0 ? (
-                                        story.media[0]
+                                        story
+                                            .media[0]
                                             .type ===
                                         "video" ? (
                                             <video
@@ -517,11 +556,14 @@ export default function Stories() {
                                 </div>
 
                                 <div className="story-content">
+
                                     <div className="story-author">
                                         <div className="author-avatar">
-                                            {story.author
+                                            {story
+                                                .author
                                                 ?.initials ||
-                                                story.author
+                                                story
+                                                    .author
                                                     ?.username
                                                     ?.charAt(
                                                         0
@@ -576,22 +618,28 @@ export default function Stories() {
 
                                     <div className="story-tags">
                                         {(
-                                            story.tags ||
-                                            []
+                                            Array.isArray(
+                                                story.tags
+                                            )
+                                                ? story.tags
+                                                : []
                                         ).map(
-                                            (tag) => (
+                                            tag => (
                                                 <span
                                                     key={
                                                         tag
                                                     }
                                                 >
-                                                    {tag}
+                                                    {
+                                                        tag
+                                                    }
                                                 </span>
                                             )
                                         )}
                                     </div>
 
                                     <div className="story-actions">
+
                                         <button
                                             className={
                                                 story.liked
@@ -669,9 +717,7 @@ export default function Stories() {
                                                 ] ||
                                                 ""
                                             }
-                                            onChange={(
-                                                event
-                                            ) =>
+                                            onChange={event =>
                                                 handleCommentChange(
                                                     story.id,
                                                     event
@@ -679,9 +725,7 @@ export default function Stories() {
                                                         .value
                                                 )
                                             }
-                                            onKeyDown={(
-                                                event
-                                            ) => {
+                                            onKeyDown={event => {
                                                 if (
                                                     event.key ===
                                                     "Enter"
@@ -738,7 +782,7 @@ export default function Stories() {
                 >
                     <div
                         className="story-modal"
-                        onClick={(event) =>
+                        onClick={event =>
                             event.stopPropagation()
                         }
                     >
@@ -756,6 +800,7 @@ export default function Stories() {
                         )}
 
                         <div className="story-detail">
+
                             <div className="story-detail-type">
                                 {selectedStory.type ||
                                     "Story"}
@@ -768,6 +813,7 @@ export default function Stories() {
                             </h1>
 
                             <div className="story-detail-author">
+
                                 <div className="author-avatar">
                                     {selectedStory
                                         .author
@@ -802,6 +848,7 @@ export default function Stories() {
                             </div>
 
                             <div className="story-detail-actions">
+
                                 <button
                                     className={
                                         selectedStory.liked
@@ -864,9 +911,12 @@ export default function Stories() {
 
                             <div className="story-detail-tags">
                                 {(
-                                    selectedStory.tags ||
-                                    []
-                                ).map((tag) => (
+                                    Array.isArray(
+                                        selectedStory.tags
+                                    )
+                                        ? selectedStory.tags
+                                        : []
+                                ).map(tag => (
                                     <span key={tag}>
                                         {tag}
                                     </span>
@@ -885,23 +935,24 @@ export default function Stories() {
                             </h3>
 
                             <div className="story-detail-comment-box">
+
                                 <input
                                     type="text"
                                     placeholder="Write a comment..."
                                     value={
                                         commentText[
-                                            selectedStory
-                                                .id
+                                            selectedStory.id
                                         ] || ""
                                     }
-                                    onChange={(event) =>
+                                    onChange={event =>
                                         handleCommentChange(
                                             selectedStory.id,
-                                            event.target
+                                            event
+                                                .target
                                                 .value
                                         )
                                     }
-                                    onKeyDown={(event) => {
+                                    onKeyDown={event => {
                                         if (
                                             event.key ===
                                             "Enter"
@@ -946,11 +997,12 @@ export default function Stories() {
                             )}
 
                             <div className="comments-list">
+
                                 {Array.isArray(
                                     selectedStory.comments
                                 ) &&
                                     selectedStory.comments.map(
-                                        (comment) => (
+                                        comment => (
                                             <div
                                                 className="comment"
                                                 key={
@@ -1011,7 +1063,8 @@ export default function Stories() {
                                     selectedStory.comments
                                 ) &&
                                     selectedStory.comments
-                                        .length === 0 && (
+                                        .length ===
+                                        0 && (
                                         <p className="no-comments">
                                             No comments yet.
                                             Be the first to
@@ -1025,12 +1078,12 @@ export default function Stories() {
                                     <p className="no-comments">
                                         Opened story
                                         successfully.
-                                        Comments will
-                                        appear here when
-                                        the detail endpoint
-                                        returns them.
+                                        Comments will appear
+                                        here when the detail
+                                        endpoint returns them.
                                     </p>
                                 )}
+
                             </div>
                         </div>
                     </div>
