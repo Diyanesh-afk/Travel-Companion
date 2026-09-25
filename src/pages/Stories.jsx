@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import Layout from "../components/Layout";
+import { get, post, del } from "../api";
 import "./Stories.css";
-
 
 const categories = [
     "All",
@@ -13,9 +14,9 @@ const categories = [
     "Family",
 ];
 
-const API_URL = "/api";
-
 export default function Stories() {
+    const navigate = useNavigate();
+
     const [stories, setStories] = useState([]);
     const [activeCategory, setActiveCategory] = useState("All");
 
@@ -39,23 +40,17 @@ export default function Stories() {
             setLoading(true);
             setError("");
 
-            const response = await fetch(`${API_URL}/stories/`, {
-                credentials: "include",
-            });
+            const response = await get("/api/stories/");
 
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(
-                    data.error || "Unable to load stories."
-                );
-            }
-
-            setStories(data.items || []);
+            setStories(response.items || []);
         } catch (err) {
+            console.error("Stories loading failed:", err);
+
             setError(
                 err.message || "Unable to load stories."
             );
+
+            setStories([]);
         } finally {
             setLoading(false);
         }
@@ -67,40 +62,17 @@ export default function Stories() {
         setDetailError("");
 
         try {
-            const response = await fetch(
-                `${API_URL}/stories/${story.id}/`,
-                {
-                    credentials: "include",
-                }
+            const data = await get(
+                `/api/stories/${story.id}/`
             );
-
-            const text = await response.text();
-
-            let data = {};
-
-            if (text) {
-                try {
-                    data = JSON.parse(text);
-                } catch {
-                    throw new Error(
-                        "The server returned an invalid response."
-                    );
-                }
-            }
-
-            if (!response.ok) {
-                throw new Error(
-                    data.error || "Unable to open this story."
-                );
-            }
 
             setSelectedStory(data.story || data);
         } catch (err) {
-            /*
-             * If the detail endpoint is unavailable, we still
-             * show the story that we already loaded from /stories/.
-             */
-            setDetailError(err.message);
+            console.error("Story detail error:", err);
+
+            setDetailError(
+                err.message || "Unable to open this story."
+            );
         } finally {
             setDetailLoading(false);
         }
@@ -113,21 +85,9 @@ export default function Stories() {
 
     async function handleLike(storyId) {
         try {
-            const response = await fetch(
-                `${API_URL}/stories/${storyId}/like/`,
-                {
-                    method: "POST",
-                    credentials: "include",
-                }
+            const data = await post(
+                `/api/stories/${storyId}/like/`
             );
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(
-                    data.error || "Unable to like story."
-                );
-            }
 
             setStories((currentStories) =>
                 currentStories.map((story) =>
@@ -142,7 +102,8 @@ export default function Stories() {
             );
 
             setSelectedStory((currentStory) =>
-                currentStory && currentStory.id === storyId
+                currentStory &&
+                currentStory.id === storyId
                     ? {
                           ...currentStory,
                           liked: data.liked,
@@ -152,26 +113,18 @@ export default function Stories() {
             );
         } catch (err) {
             console.error("Like error:", err);
+
+            alert(
+                err.message || "Unable to like story."
+            );
         }
     }
 
     async function handleSave(storyId) {
         try {
-            const response = await fetch(
-                `${API_URL}/stories/${storyId}/save/`,
-                {
-                    method: "POST",
-                    credentials: "include",
-                }
+            const data = await post(
+                `/api/stories/${storyId}/save/`
             );
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(
-                    data.error || "Unable to save story."
-                );
-            }
 
             setStories((currentStories) =>
                 currentStories.map((story) =>
@@ -186,7 +139,8 @@ export default function Stories() {
             );
 
             setSelectedStory((currentStory) =>
-                currentStory && currentStory.id === storyId
+                currentStory &&
+                currentStory.id === storyId
                     ? {
                           ...currentStory,
                           saved: data.saved,
@@ -196,16 +150,23 @@ export default function Stories() {
             );
         } catch (err) {
             console.error("Save error:", err);
+
+            alert(
+                err.message || "Unable to save story."
+            );
         }
     }
 
     async function handleComment(storyId) {
-        const text = (commentText[storyId] || "").trim();
+        const text = (
+            commentText[storyId] || ""
+        ).trim();
 
         if (!text) {
             setCommentErrors((current) => ({
                 ...current,
-                [storyId]: "Please write a comment first.",
+                [storyId]:
+                    "Please write a comment first.",
             }));
 
             return;
@@ -222,27 +183,12 @@ export default function Stories() {
                 [storyId]: "",
             }));
 
-            const response = await fetch(
-                `${API_URL}/stories/${storyId}/comments/`,
+            const data = await post(
+                `/api/stories/${storyId}/comments/`,
                 {
-                    method: "POST",
-                    credentials: "include",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({
-                        text,
-                    }),
+                    text,
                 }
             );
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(
-                    data.error || "Unable to add comment."
-                );
-            }
 
             setStories((currentStories) =>
                 currentStories.map((story) =>
@@ -250,7 +196,11 @@ export default function Stories() {
                         ? {
                               ...story,
                               comments:
-                                  (story.comments || 0) + 1,
+                                  Array.isArray(
+                                      story.comments
+                                  )
+                                      ? story.comments.length + 1
+                                      : (story.comments || 0) + 1,
                           }
                         : story
                 )
@@ -267,17 +217,26 @@ export default function Stories() {
                 const newComment =
                     data.comment || null;
 
+                if (
+                    Array.isArray(
+                        currentStory.comments
+                    )
+                ) {
+                    return {
+                        ...currentStory,
+                        comments: newComment
+                            ? [
+                                  ...currentStory.comments,
+                                  newComment,
+                              ]
+                            : currentStory.comments,
+                    };
+                }
+
                 return {
                     ...currentStory,
                     comments:
-                        Array.isArray(currentStory.comments)
-                            ? newComment
-                                ? [
-                                      ...currentStory.comments,
-                                      newComment,
-                                  ]
-                                : currentStory.comments
-                            : (currentStory.comments || 0) + 1,
+                        (currentStory.comments || 0) + 1,
                 };
             });
 
@@ -286,6 +245,8 @@ export default function Stories() {
                 [storyId]: "",
             }));
         } catch (err) {
+            console.error("Comment error:", err);
+
             setCommentErrors((current) => ({
                 ...current,
                 [storyId]:
@@ -307,80 +268,111 @@ export default function Stories() {
         }));
     }
 
-async function handleDeleteStory(storyId) {
-    if (!window.confirm("Delete this story? This cannot be undone.")) {
-        return;
-    }
-
-    try {
-        const response = await fetch(
-            `${API_URL}/stories/${storyId}/`,
-            {
-                method: "DELETE",
-                credentials: "include",
-                headers: {
-                    "X-CSRFToken":
-                        decodeURIComponent(
-                            document.cookie
-                                .split("; ")
-                                .find(row =>
-                                    row.startsWith("csrftoken=")
-                                )
-                                ?.split("=")[1] || ""
-                        ),
-                },
-            }
-        );
-
-        const data = await response.json().catch(() => ({}));
-
-        if (!response.ok) {
-            throw new Error(
-                data.error ||
-                data.detail ||
-                "Unable to delete story."
-            );
+    async function handleDeleteStory(storyId) {
+        if (
+            !window.confirm(
+                "Delete this story? This cannot be undone."
+            )
+        ) {
+            return;
         }
 
-        setStories(current =>
-            current.filter(story => story.id !== storyId)
-        );
-
-        setSelectedStory(current =>
-            current?.id === storyId
-                ? null
-                : current
-        );
-
-    } catch (err) {
-        alert(
-            err.message ||
-            "Unable to delete story."
-        );
-    }
-}
-
-    async function handleDeleteComment(commentId, storyId) {
-        if (!window.confirm("Delete this comment?")) return;
         try {
-            const response = await fetch(`${API_URL}/comments/${commentId}/`, { method: "DELETE", credentials: "include" });
-            const data = await response.json().catch(() => ({}));
-            if (!response.ok) throw new Error(data.error || "Unable to delete comment.");
-            setSelectedStory(current => current && current.id === storyId && Array.isArray(current.comments) ? { ...current, comments: current.comments.filter(c => c.id !== commentId) } : current);
-            setStories(current => current.map(story => story.id === storyId ? { ...story, comments: Math.max(0, (story.comments || 0) - 1) } : story));
-        } catch (err) { alert(err.message || "Unable to delete comment."); }
+            await del(
+                `/api/stories/${storyId}/`
+            );
+
+            setStories((current) =>
+                current.filter(
+                    (story) => story.id !== storyId
+                )
+            );
+
+            setSelectedStory((current) =>
+                current?.id === storyId
+                    ? null
+                    : current
+            );
+        } catch (err) {
+            alert(
+                err.message ||
+                    "Unable to delete story."
+            );
+        }
+    }
+
+    async function handleDeleteComment(
+        commentId,
+        storyId
+    ) {
+        if (
+            !window.confirm(
+                "Delete this comment?"
+            )
+        ) {
+            return;
+        }
+
+        try {
+            await del(
+                `/api/comments/${commentId}/`
+            );
+
+            setSelectedStory((current) => {
+                if (
+                    !current ||
+                    current.id !== storyId ||
+                    !Array.isArray(current.comments)
+                ) {
+                    return current;
+                }
+
+                return {
+                    ...current,
+                    comments:
+                        current.comments.filter(
+                            (comment) =>
+                                comment.id !== commentId
+                        ),
+                };
+            });
+
+            setStories((current) =>
+                current.map((story) =>
+                    story.id === storyId
+                        ? {
+                              ...story,
+                              comments:
+                                  Math.max(
+                                      0,
+                                      (story.comments || 0) - 1
+                                  ),
+                          }
+                        : story
+                )
+            );
+        } catch (err) {
+            alert(
+                err.message ||
+                    "Unable to delete comment."
+            );
+        }
     }
 
     const filteredStories =
         activeCategory === "All"
             ? stories
             : stories.filter((story) => {
-                  const tags = story.tags || [];
+                  const tags =
+                      story.tags || [];
 
                   return tags.some(
                       (tag) =>
-                          tag.toLowerCase() ===
-                          activeCategory.toLowerCase()
+                          tag
+                              .toLowerCase()
+                              .includes(
+                                  activeCategory.toLowerCase()
+                              )
                   );
               });
 
@@ -390,38 +382,44 @@ async function handleDeleteStory(storyId) {
                 <div className="stories-header">
                     <div>
                         <h1>Stories</h1>
+
                         <p>
-                            Real experiences. Told honestly.
+                            Real experiences.
+                            Told honestly.
                         </p>
                     </div>
 
                     <button
                         className="primary-button"
-                        onClick={() => {
-                            window.location.href =
-                                "/stories/new";
-                        }}
+                        onClick={() =>
+                            navigate("/stories/new")
+                        }
                     >
                         + Share your story
                     </button>
                 </div>
 
                 <div className="story-categories">
-                    {categories.map((category) => (
-                        <button
-                            key={category}
-                            className={
-                                activeCategory === category
-                                    ? "category active"
-                                    : "category"
-                            }
-                            onClick={() =>
-                                setActiveCategory(category)
-                            }
-                        >
-                            {category}
-                        </button>
-                    ))}
+                    {categories.map(
+                        (category) => (
+                            <button
+                                key={category}
+                                className={
+                                    activeCategory ===
+                                    category
+                                        ? "category active"
+                                        : "category"
+                                }
+                                onClick={() =>
+                                    setActiveCategory(
+                                        category
+                                    )
+                                }
+                            >
+                                {category}
+                            </button>
+                        )
+                    )}
                 </div>
 
                 {loading && (
@@ -438,227 +436,298 @@ async function handleDeleteStory(storyId) {
 
                 {!loading &&
                     !error &&
-                    filteredStories.length === 0 && (
+                    filteredStories.length ===
+                        0 && (
                         <div className="stories-message">
-                            No stories found in this category.
+                            No stories found in
+                            this category.
                         </div>
                     )}
 
                 <div className="stories-grid">
-                    {filteredStories.map((story) => (
-                        <article
-                            className="story-card"
-                            key={story.id}
-                        >
-                            <div
-    className="story-image"
-    onClick={() => openStory(story)}
->
-    {story.media?.length > 0 ? (
-        story.media[0].type === "video" ? (
-            <video
-                src={story.media[0].url}
-                muted
-                playsInline
-                preload="metadata"
-                className="story-media-preview"
-            />
-        ) : (
-            <img
-                src={story.media[0].url}
-                alt={story.title || "Travel story"}
-                className="story-media-preview"
-            />
-        )
-    ) : (
-        <div className="story-image-fallback">
-            <span>
-                {story.type || "Story"}
-            </span>
-        </div>
-    )}
-
-    <span className="story-type-badge">
-        {story.type || "Story"}
-    </span>
-
-    {story.media?.length > 1 && (
-        <span className="story-media-count">
-            +{story.media.length - 1}
-        </span>
-    )}
-</div>
-                            <div className="story-content">
-                                <div className="story-author">
-                                    <div className="author-avatar">
-                                        {story.author?.initials ||
-                                            story.author?.username
-                                                ?.charAt(0)
-                                                ?.toUpperCase() ||
-                                            "U"}
-                                    </div>
-
-                                    <div>
-                                        <strong>
-                                            {story.author?.name ||
-                                                story.author
-                                                    ?.username ||
-                                                "Traveler"}
-                                        </strong>
-
-                                        <small>
-                                            📍{" "}
-                                            {story.location ||
-                                                "India"}
-                                        </small>
-                                    </div>
-
-                                    <span className="read-time">
-                                        {story.readTime ||
-                                            "5 min"}
-                                    </span>
-                                </div>
-
-                                <h2
+                    {filteredStories.map(
+                        (story) => (
+                            <article
+                                className="story-card"
+                                key={story.id}
+                            >
+                                <div
+                                    className="story-image"
                                     onClick={() =>
-                                        openStory(story)
+                                        openStory(
+                                            story
+                                        )
                                     }
-                                    style={{
-                                        cursor: "pointer",
-                                    }}
                                 >
-                                    {story.title}
-                                </h2>
-
-                                <p className="story-excerpt">
-                                    {story.excerpt ||
-                                        story.body ||
-                                        "A travel story shared by the community."}
-                                </p>
-
-                                <div className="story-tags">
-                                    {(story.tags || []).map(
-                                        (tag) => (
-                                            <span key={tag}>
-                                                {tag}
+                                    {story.media?.length >
+                                    0 ? (
+                                        story.media[0]
+                                            .type ===
+                                        "video" ? (
+                                            <video
+                                                src={
+                                                    story
+                                                        .media[0]
+                                                        .url
+                                                }
+                                                muted
+                                                playsInline
+                                                preload="metadata"
+                                                className="story-media-preview"
+                                            />
+                                        ) : (
+                                            <img
+                                                src={
+                                                    story
+                                                        .media[0]
+                                                        .url
+                                                }
+                                                alt={
+                                                    story.title ||
+                                                    "Travel story"
+                                                }
+                                                className="story-media-preview"
+                                            />
+                                        )
+                                    ) : (
+                                        <div className="story-image-fallback">
+                                            <span>
+                                                {story.type ||
+                                                    "Story"}
                                             </span>
-                                        )
+                                        </div>
+                                    )}
+
+                                    <span className="story-type-badge">
+                                        {story.type ||
+                                            "Story"}
+                                    </span>
+
+                                    {story.media
+                                        ?.length >
+                                        1 && (
+                                        <span className="story-media-count">
+                                            +
+                                            {story
+                                                .media
+                                                .length -
+                                                1}
+                                        </span>
                                     )}
                                 </div>
 
-                                <div className="story-actions">
-                                    <button
-                                        className={
-                                            story.liked
-                                                ? "action active"
-                                                : "action"
-                                        }
+                                <div className="story-content">
+                                    <div className="story-author">
+                                        <div className="author-avatar">
+                                            {story.author
+                                                ?.initials ||
+                                                story.author
+                                                    ?.username
+                                                    ?.charAt(
+                                                        0
+                                                    )
+                                                    ?.toUpperCase() ||
+                                                "U"}
+                                        </div>
+
+                                        <div>
+                                            <strong>
+                                                {story
+                                                    .author
+                                                    ?.name ||
+                                                    story
+                                                        .author
+                                                        ?.username ||
+                                                    "Traveler"}
+                                            </strong>
+
+                                            <small>
+                                                📍{" "}
+                                                {story.location ||
+                                                    "India"}
+                                            </small>
+                                        </div>
+
+                                        <span className="read-time">
+                                            {story.readTime ||
+                                                "5 min"}
+                                        </span>
+                                    </div>
+
+                                    <h2
                                         onClick={() =>
-                                            handleLike(
-                                                story.id
+                                            openStory(
+                                                story
                                             )
                                         }
+                                        style={{
+                                            cursor:
+                                                "pointer",
+                                        }}
                                     >
-                                        ♥{" "}
-                                        {story.likes || 0}
-                                    </button>
+                                        {story.title}
+                                    </h2>
 
-                                    <button
-                                        className="action"
-                                        onClick={() =>
-                                            openStory(story)
-                                        }
-                                    >
-                                        💬{" "}
-                                        {Array.isArray(
-                                            story.comments
-                                        )
-                                            ? story.comments
-                                                  .length
-                                            : story.comments ||
-                                              0}
-                                    </button>
+                                    <p className="story-excerpt">
+                                        {story.excerpt ||
+                                            story.body ||
+                                            "A travel story shared by the community."}
+                                    </p>
 
-                                    <button
-                                        className={
-                                            story.saved
-                                                ? "action active"
-                                                : "action"
-                                        }
-                                        onClick={() =>
-                                            handleSave(
-                                                story.id
+                                    <div className="story-tags">
+                                        {(
+                                            story.tags ||
+                                            []
+                                        ).map(
+                                            (tag) => (
+                                                <span
+                                                    key={
+                                                        tag
+                                                    }
+                                                >
+                                                    {tag}
+                                                </span>
                                             )
-                                        }
-                                    >
-                                        🔖{" "}
-                                        {story.saves || 0}
-                                    </button>
-                                    {story.isOwner && (
-                                        <button className="action" onClick={() => handleDeleteStory(story.id)}>🗑️ Delete</button>
-                                    )}
-                                </div>
+                                        )}
+                                    </div>
 
-                                <div className="comment-box">
-                                    <input
-                                        type="text"
-                                        placeholder="Write a comment..."
-                                        value={
-                                            commentText[
-                                                story.id
-                                            ] || ""
-                                        }
-                                        onChange={(event) =>
-                                            handleCommentChange(
-                                                story.id,
-                                                event.target
-                                                    .value
+                                    <div className="story-actions">
+                                        <button
+                                            className={
+                                                story.liked
+                                                    ? "action active"
+                                                    : "action"
+                                            }
+                                            onClick={() =>
+                                                handleLike(
+                                                    story.id
+                                                )
+                                            }
+                                        >
+                                            ♥{" "}
+                                            {story.likes ||
+                                                0}
+                                        </button>
+
+                                        <button
+                                            className="action"
+                                            onClick={() =>
+                                                openStory(
+                                                    story
+                                                )
+                                            }
+                                        >
+                                            💬{" "}
+                                            {Array.isArray(
+                                                story.comments
                                             )
-                                        }
-                                        onKeyDown={(event) => {
-                                            if (
-                                                event.key ===
-                                                "Enter"
-                                            ) {
+                                                ? story
+                                                      .comments
+                                                      .length
+                                                : story.comments ||
+                                                  0}
+                                        </button>
+
+                                        <button
+                                            className={
+                                                story.saved
+                                                    ? "action active"
+                                                    : "action"
+                                            }
+                                            onClick={() =>
+                                                handleSave(
+                                                    story.id
+                                                )
+                                            }
+                                        >
+                                            🔖{" "}
+                                            {story.saves ||
+                                                0}
+                                        </button>
+
+                                        {story.isOwner && (
+                                            <button
+                                                className="action"
+                                                onClick={() =>
+                                                    handleDeleteStory(
+                                                        story.id
+                                                    )
+                                                }
+                                            >
+                                                🗑️ Delete
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    <div className="comment-box">
+                                        <input
+                                            type="text"
+                                            placeholder="Write a comment..."
+                                            value={
+                                                commentText[
+                                                    story.id
+                                                ] ||
+                                                ""
+                                            }
+                                            onChange={(
+                                                event
+                                            ) =>
+                                                handleCommentChange(
+                                                    story.id,
+                                                    event
+                                                        .target
+                                                        .value
+                                                )
+                                            }
+                                            onKeyDown={(
+                                                event
+                                            ) => {
+                                                if (
+                                                    event.key ===
+                                                    "Enter"
+                                                ) {
+                                                    handleComment(
+                                                        story.id
+                                                    );
+                                                }
+                                            }}
+                                        />
+
+                                        <button
+                                            onClick={() =>
                                                 handleComment(
                                                     story.id
-                                                );
+                                                )
                                             }
-                                        }}
-                                    />
-
-                                    <button
-                                        onClick={() =>
-                                            handleComment(
-                                                story.id
-                                            )
-                                        }
-                                        disabled={
-                                            commentLoading[
+                                            disabled={
+                                                commentLoading[
+                                                    story.id
+                                                ]
+                                            }
+                                        >
+                                            {commentLoading[
                                                 story.id
                                             ]
-                                        }
-                                    >
-                                        {commentLoading[
-                                            story.id
-                                        ]
-                                            ? "..."
-                                            : "Post"}
-                                    </button>
+                                                ? "..."
+                                                : "Post"}
+                                        </button>
+                                    </div>
+
+                                    {commentErrors[
+                                        story.id
+                                    ] && (
+                                        <p className="comment-error">
+                                            {
+                                                commentErrors[
+                                                    story.id
+                                                ]
+                                            }
+                                        </p>
+                                    )}
                                 </div>
-
-                                {commentErrors[story.id] && (
-                                    <p className="comment-error">
-                                        {
-                                            commentErrors[
-                                                story.id
-                                            ]
-                                        }
-                                    </p>
-                                )}
-                            </div>
-                        </article>
-                    ))}
+                            </article>
+                        )
+                    )}
                 </div>
             </div>
 
@@ -693,25 +762,33 @@ async function handleDeleteStory(storyId) {
                             </div>
 
                             <h1>
-                                {selectedStory.title}
+                                {
+                                    selectedStory.title
+                                }
                             </h1>
 
                             <div className="story-detail-author">
                                 <div className="author-avatar">
-                                    {selectedStory.author
+                                    {selectedStory
+                                        .author
                                         ?.initials ||
-                                        selectedStory.author
+                                        selectedStory
+                                            .author
                                             ?.username
-                                            ?.charAt(0)
+                                            ?.charAt(
+                                                0
+                                            )
                                             ?.toUpperCase() ||
                                         "U"}
                                 </div>
 
                                 <div>
                                     <strong>
-                                        {selectedStory.author
+                                        {selectedStory
+                                            .author
                                             ?.name ||
-                                            selectedStory.author
+                                            selectedStory
+                                                .author
                                                 ?.username ||
                                             "Traveler"}
                                     </strong>
@@ -760,7 +837,16 @@ async function handleDeleteStory(storyId) {
                                 </button>
 
                                 {selectedStory.isOwner && (
-                                    <button className="action" onClick={() => handleDeleteStory(selectedStory.id)}>🗑️ Delete</button>
+                                    <button
+                                        className="action"
+                                        onClick={() =>
+                                            handleDeleteStory(
+                                                selectedStory.id
+                                            )
+                                        }
+                                    >
+                                        🗑️ Delete
+                                    </button>
                                 )}
                             </div>
 
@@ -777,13 +863,14 @@ async function handleDeleteStory(storyId) {
                             </div>
 
                             <div className="story-detail-tags">
-                                {(selectedStory.tags || []).map(
-                                    (tag) => (
-                                        <span key={tag}>
-                                            {tag}
-                                        </span>
-                                    )
-                                )}
+                                {(
+                                    selectedStory.tags ||
+                                    []
+                                ).map((tag) => (
+                                    <span key={tag}>
+                                        {tag}
+                                    </span>
+                                ))}
                             </div>
 
                             <hr />
@@ -803,13 +890,15 @@ async function handleDeleteStory(storyId) {
                                     placeholder="Write a comment..."
                                     value={
                                         commentText[
-                                            selectedStory.id
+                                            selectedStory
+                                                .id
                                         ] || ""
                                     }
                                     onChange={(event) =>
                                         handleCommentChange(
                                             selectedStory.id,
-                                            event.target.value
+                                            event.target
+                                                .value
                                         )
                                     }
                                     onKeyDown={(event) => {
@@ -898,8 +987,20 @@ async function handleDeleteStory(storyId) {
                                                             comment.text
                                                         }
                                                     </p>
+
                                                     {comment.isOwner && (
-                                                        <button type="button" className="logout-mini" onClick={() => handleDeleteComment(comment.id, selectedStory.id)}>Delete</button>
+                                                        <button
+                                                            type="button"
+                                                            className="logout-mini"
+                                                            onClick={() =>
+                                                                handleDeleteComment(
+                                                                    comment.id,
+                                                                    selectedStory.id
+                                                                )
+                                                            }
+                                                        >
+                                                            Delete
+                                                        </button>
                                                     )}
                                                 </div>
                                             </div>
@@ -922,10 +1023,12 @@ async function handleDeleteStory(storyId) {
                                     selectedStory.comments
                                 ) && (
                                     <p className="no-comments">
-                                        Opened story successfully.
-                                        Comments will appear
-                                        here when the detail
-                                        endpoint returns them.
+                                        Opened story
+                                        successfully.
+                                        Comments will
+                                        appear here when
+                                        the detail endpoint
+                                        returns them.
                                     </p>
                                 )}
                             </div>
