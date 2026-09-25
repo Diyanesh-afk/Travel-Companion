@@ -1,65 +1,44 @@
-# Travel Companion — Full-stack travel community app
+Travel Companion
+Full-stack travel community platform
 
-A React + Vite frontend with a Django backend. The application includes authentication, destinations, trip planning, community stories with media uploads, likes/saves/comments, travel questions and answers, profiles, search, and a staff dashboard.
+[Live Demo] [GitHub]
 
-## 1. Backend
+📸 Screenshots
 
-From `travel/backend/travelBackend`:
+🚀 Features
+• User authentication
+• Travel stories
+• Multiple image/video uploads
+• Trip planning
+• Likes & saves
+• Comments
+• Questions & answers
+• User profiles
+• Owner-based content deletion
+• Django REST APIs
 
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r ..\requirements.txt
-```
+🛠 Tech Stack
+Frontend
+React
+Vite
+JavaScript
+CSS
 
-For the fastest local setup, use SQLite:
+Backend
+Django
+Python
+MySQL
 
-```powershell
-$env:DB_ENGINE="sqlite"
-python manage.py migrate
-python manage.py seed_data
-python manage.py runserver
-```
+🔐 Security
+• Authentication
+• CSRF protection
+• Owner-based authorization
+• Protected CRUD operations
 
-For MySQL, set `DB_ENGINE=mysql` and the `MYSQL_*` variables from `.env.example`, create the database, then run migrations and the seed command.
+📁 Project Structure
 
-Demo account: `demo` / `demo12345`
+⚙️ Local Setup
 
-## 2. Frontend
+📡 API Overview
 
-From `travel`:
-
-```powershell
-npm install
-npm run dev
-```
-
-Open the Vite URL shown in the terminal. Vite proxies `/api` to Django at `http://127.0.0.1:8000`.
-
-For a production build:
-
-```powershell
-npm run build
-npm run preview
-```
-
-## 3. Included working flows
-
-- Registration, login, logout and session persistence
-- Home dashboard with live API content
-- Destination search, category filters and detail pages
-- One-click trip creation from a destination
-- Profile editing and statistics
-- Create, list and delete personal trips
-- Create travel stories with image/video uploads
-- Story detail modal, likes, saves and comments
-- Saved stories
-- Travel questions, categories, question details and answers
-- Global destination/story/user search
-- Staff dashboard with platform metrics and destination creation
-- Django admin at `/admin/`
-- Media serving for local development
-
-## 4. Production notes
-
-Set `DJANGO_DEBUG=False`, use a strong `DJANGO_SECRET_KEY`, configure production `ALLOWED_HOSTS`, HTTPS/secure cookies, persistent media storage, and MySQL/PostgreSQL. Run migrations before deployment.
+🚀 Deployment
