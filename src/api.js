@@ -1,17 +1,31 @@
-function getCookie(name) {
-    const cookies = document.cookie ? document.cookie.split("; ") : [];
+const API_BASE_URL = "https://travel-companion-coral.vercel.app";
 
-    for (const cookie of cookies) {
-        const [key, ...valueParts] = cookie.split("=");
+let csrfToken = null;
 
-        if (key === name) {
-            return decodeURIComponent(valueParts.join("="));
-        }
+async function getCsrfToken() {
+    if (csrfToken) {
+        return csrfToken;
     }
 
-    return null;
-}
+    const response = await fetch(`${API_BASE_URL}/api/csrf/`, {
+        method: "GET",
+        credentials: "include",
+    });
 
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+        throw new Error(
+            data.error ||
+            data.detail ||
+            `CSRF request failed (${response.status})`
+        );
+    }
+
+    csrfToken = data.csrfToken;
+
+    return csrfToken;
+}
 
 const api = async (path, options = {}) => {
     const method = (options.method || "GET").toUpperCase();
@@ -20,7 +34,6 @@ const api = async (path, options = {}) => {
         ...(options.headers || {}),
     };
 
-    // Only add JSON content type when we are actually sending JSON.
     if (
         options.body &&
         !(options.body instanceof FormData) &&
@@ -29,19 +42,15 @@ const api = async (path, options = {}) => {
         headers["Content-Type"] = "application/json";
     }
 
-    // Django CSRF protection.
-    // Required for unsafe requests such as POST, PUT, PATCH and DELETE.
-    if (
-        ["POST", "PUT", "PATCH", "DELETE"].includes(method)
-    ) {
-        const csrfToken = getCookie("csrftoken");
+    if (["POST", "PUT", "PATCH", "DELETE"].includes(method)) {
+        const token = await getCsrfToken();
 
-        if (csrfToken) {
-            headers["X-CSRFToken"] = csrfToken;
+        if (token) {
+            headers["X-CSRFToken"] = token;
         }
     }
 
-    const response = await fetch(path, {
+    const response = await fetch(`${API_BASE_URL}${path}`, {
         credentials: "include",
         ...options,
         headers,
@@ -60,11 +69,9 @@ const api = async (path, options = {}) => {
     return data;
 };
 
-
 export const get = (path) => {
     return api(path);
 };
-
 
 export const post = (path, body = {}) => {
     return api(path, {
@@ -73,13 +80,11 @@ export const post = (path, body = {}) => {
     });
 };
 
-
 export const del = (path) => {
     return api(path, {
         method: "DELETE",
     });
 };
-
 
 export const put = (path, body = {}) => {
     return api(path, {
@@ -88,14 +93,12 @@ export const put = (path, body = {}) => {
     });
 };
 
-
 export const patch = (path, body = {}) => {
     return api(path, {
         method: "PATCH",
         body: JSON.stringify(body),
     });
 };
-
 
 export const auth = {
     me: () => get("/api/me/"),
@@ -112,6 +115,5 @@ export const auth = {
         return post("/api/auth/logout/");
     },
 };
-
 
 export default api;
