@@ -63,9 +63,11 @@ else:
             "PASSWORD": os.getenv("MYSQL_PASSWORD", "root"),
             "HOST": os.getenv("MYSQL_HOST", "127.0.0.1"),
             "PORT": os.getenv("MYSQL_PORT", "3306"),
+            "OPTIONS": {
+                "ssl": {},
+            },
         }
     }
-
 AUTH_PASSWORD_VALIDATORS = [
     {
         "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"
